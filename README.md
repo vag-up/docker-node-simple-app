@@ -10,13 +10,14 @@ Ansibleを使用して必要なソフトウェアのインストールと設定�
 - **OS**: Ubuntu 24.04 (bento/ubuntu-24.04)
 - **Docker**: geerlingguy.docker ロールによるインストール
 - **タイムゾーン**: Asia/Tokyo
+- **SSL/TLS**: 自己署名証明書によるHTTPS接続
 
 ### Dockerコンテナ構成
 
 | コンテナ | 説明 |
 |---------|------|
 | Node.js | Node.js v24 アプリケーションサーバー |
-| Nginx | リバースプロキシ/Webサーバー |
+| Nginx | リバースプロキシ/Webサーバー（HTTPS対応） |
 | MariaDB | データベースサーバー |
 | Redis | キャッシュサーバー |
 
@@ -120,6 +121,34 @@ MariaDBの初期設定は以下の通りです（`playbooks/vars/main.yml` で�
 - `playbooks/main.yml` を編集することで、追加のパッケージやタスクを追加できます
 - `Vagrantfile` の `vb.memory` を編集して、仮想マシンのメモリ割り当てを変更できます
 
+## SSL/HTTPS接続
+
+この環境では、NginxがHTTPS（ポート443）でリッスンし、自己署名SSL証明書を使用してセキュアな接続を提供します。
+
+### 証明書の詳細
+
+- **証明書タイプ**: 自己署名証明書（OpenSSLで自動生成）
+- **有効期限**: 365日
+- **鍵長**: RSA 4096ビット
+- **対応プロトコル**: TLS 1.2, TLS 1.3
+
+### HTTPからHTTPSへの自動リダイレクト
+
+HTTPポート（80）へのアクセスは自動的にHTTPS（443）にリダイケクトされます。
+
+### ブラウザからのアクセス時の注意
+
+自己署名証明書を使用しているため、ブラウザで初回アクセス時に「安全ではありません」という警告が表示されます。
+これは開発環境では正常な動作です。以下の手順で続行できます：
+
+1. ブラウザで `https://192.168.33.10` にアクセス
+2. 「詳細設定」または「Advanced」をクリック
+3. 「安全ではないページに移動」または「Proceed to 192.168.33.10 (unsafe)」をクリック
+
+### curlコマンドでのアクセス
+
+`curl` コマンドを使用する場合は、`-k`（または `--insecure`）オプションを付けることで、自己署名証明書を許可できます。
+
 ## アプリケーション
 
 `playbooks/app` ディレクトリに Express を使用したシンプルなサンプルアプリケーションが含まれています。
@@ -133,20 +162,22 @@ MariaDBの初期設定は以下の通りです（`playbooks/vars/main.yml` で�
 
 ### アプリケーションへのアクセス
 
-環境構築後、以下のURLでアクセスできます：
+環境構築後、以下のURLでアクセスできます（自己署名証明書を使用しているため `-k` オプションが必要です）：
 
 ```bash
 # ヘルスチェック
-curl http://192.168.33.10/health
+curl -k https://192.168.33.10/health
 
 # Hello エンドポイント
-curl http://192.168.33.10/hello/World
+curl -k https://192.168.33.10/hello/World
 
 # Echo エンドポイント
-curl -X POST http://192.168.33.10/echo \
+curl -k -X POST https://192.168.33.10/echo \
   -H "Content-Type: application/json" \
   -d '{"message":"test"}'
 ```
+
+**注意**: `-k` オプションは自己署名証明書を許可するために必要です。本番環境では使用しないでください。
 
 詳細は [`playbooks/app/README.md`](playbooks/app/README.md) を参照してください。
 
